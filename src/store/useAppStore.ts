@@ -8,7 +8,6 @@ import type {
   Dimension
 } from '@/types/common'
 import type { PipelineResult, PipelineStage, PipelineError, SemanticFieldType } from '@/pipeline/types'
-import type { PresentationPlan } from '@/presentation/types'
 
 const initialState = {
   probation: null as ProbationEmployee[] | null,
@@ -18,17 +17,8 @@ const initialState = {
   activeDimension: 'bu' as Dimension,
   uploadStatus: {} as Record<string, 'idle' | 'parsing' | 'success' | 'error'>,
   uploadErrors: {} as Record<string, string>,
-  probationFilters: {
-    manager: '',
-    selfStatus: '',
-    mgrStatus: '',
-    search: ''
-  },
-  offboardingFilters: {
-    bu: '',
-    tenure: '',
-    driver: ''
-  },
+  probationFilters: { manager: '', selfStatus: '', mgrStatus: '', search: '' },
+  offboardingFilters: { bu: '', tenure: '', driver: '' },
   isUploadModalOpen: false,
   pipelineState: {
     stage: 'idle' as PipelineStage,
@@ -40,32 +30,23 @@ const initialState = {
     showDiagnostics: false,
     showMappingOverride: false,
     fieldOverrides: {} as Record<string, Record<number, SemanticFieldType>>
-  },
-  presentationPlan: null as PresentationPlan | null,
+  }
 }
 
 export const useAppStore = create<AppState>((set) => ({
   ...initialState,
 
   setActiveModule: (module: Module) => set({ activeModule: module }),
-
   setActiveDimension: (dim: Dimension) => set({ activeDimension: dim }),
-
   setProbation: (data: ProbationEmployee[] | null) => set({ probation: data }),
-
   setOnboarding: (data: OnboardingDashboardData | null) => set({ onboarding: data }),
-
   setOffboarding: (data: OffboardingResponse[] | null) => set({ offboarding: data }),
 
   setUploadStatus: (module: string, status: 'idle' | 'parsing' | 'success' | 'error') =>
-    set((state) => ({
-      uploadStatus: { ...state.uploadStatus, [module]: status }
-    })),
+    set((state) => ({ uploadStatus: { ...state.uploadStatus, [module]: status } })),
 
   setUploadError: (module: string, error: string) =>
-    set((state) => ({
-      uploadErrors: { ...state.uploadErrors, [module]: error }
-    })),
+    set((state) => ({ uploadErrors: { ...state.uploadErrors, [module]: error } })),
 
   clearUploadError: (module: string) =>
     set((state) => {
@@ -75,59 +56,37 @@ export const useAppStore = create<AppState>((set) => ({
     }),
 
   setProbationFilters: (filters) =>
-    set((state) => ({
-      probationFilters: { ...state.probationFilters, ...filters }
-    })),
+    set((state) => ({ probationFilters: { ...state.probationFilters, ...filters } })),
 
   setOffboardingFilters: (filters) =>
-    set((state) => ({
-      offboardingFilters: { ...state.offboardingFilters, ...filters }
-    })),
+    set((state) => ({ offboardingFilters: { ...state.offboardingFilters, ...filters } })),
 
   setIsUploadModalOpen: (open: boolean) => set({ isUploadModalOpen: open }),
 
   setPipelineStage: (stage: PipelineStage) =>
-    set((state) => ({
-      pipelineState: { ...state.pipelineState, stage }
-    })),
+    set((state) => ({ pipelineState: { ...state.pipelineState, stage } })),
 
   setPipelineResult: (result: PipelineResult | null) =>
-    set((state) => ({
-      pipelineState: { ...state.pipelineState, result }
-    })),
+    set((state) => ({ pipelineState: { ...state.pipelineState, result } })),
 
   setPipelineErrors: (errors: PipelineError[]) =>
-    set((state) => ({
-      pipelineState: { ...state.pipelineState, errors }
-    })),
+    set((state) => ({ pipelineState: { ...state.pipelineState, errors } })),
 
   togglePipelineDiagnostics: () =>
-    set((s) => ({
-      pipelineState: { ...s.pipelineState, showDiagnostics: !s.pipelineState.showDiagnostics }
-    })),
+    set((s) => ({ pipelineState: { ...s.pipelineState, showDiagnostics: !s.pipelineState.showDiagnostics } })),
 
   togglePipelineMappingOverride: () =>
-    set((s) => ({
-      pipelineState: { ...s.pipelineState, showMappingOverride: !s.pipelineState.showMappingOverride }
-    })),
+    set((s) => ({ pipelineState: { ...s.pipelineState, showMappingOverride: !s.pipelineState.showMappingOverride } })),
 
   setFieldOverrides: (module: string, overrides: Record<number, SemanticFieldType>) =>
     set((s) => ({
       pipelineState: {
         ...s.pipelineState,
-        fieldOverrides: {
-          ...s.pipelineState.fieldOverrides,
-          [module]: overrides
-        }
+        fieldOverrides: { ...s.pipelineState.fieldOverrides, [module]: overrides }
       }
     })),
 
-  resetPipeline: () =>
-    set(() => ({
-      pipelineState: { ...initialState.pipelineState }
-    })),
-
-  setPresentationPlan: (plan: PresentationPlan | null) => set({ presentationPlan: plan }),
+  resetPipeline: () => set(() => ({ pipelineState: { ...initialState.pipelineState } })),
 
   reset: () => set(initialState)
 }))

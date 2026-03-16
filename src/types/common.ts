@@ -1,5 +1,4 @@
 import type { PipelineResult, PipelineStage, PipelineError, SemanticFieldType } from '@/pipeline/types'
-import type { PresentationPlan } from '@/presentation/types'
 
 export type Module = 'probation' | 'onboarding' | 'offboarding'
 export type Dimension = 'bu' | 'loc' | 'ten'
@@ -10,8 +9,8 @@ export interface ProbationEmployee {
   id: string
   period: string
   manager: string
-  selfStatus: string | null    // text: Completed / Not Started / In Progress / Skipped
-  selfScore: number | null     // numeric score 0-10 when present
+  selfStatus: string | null
+  selfScore: number | null
   selfDate: string | null
   mgrStatus: string | null
   mgrScore: number | null
@@ -54,10 +53,7 @@ export interface OffboardingResponse {
   ratings: Record<string, number>
 }
 
-// Re-export so store can import from one place
-export type { PresentationPlan }
-
-// ── Pipeline State ────────────────────────────────────────────────────────────
+// ── Pipeline State ─────────────────────────────────────────────────────────────
 export interface PipelineState {
   stage: PipelineStage
   currentFile: string | null
@@ -92,7 +88,6 @@ export interface AppState {
   }
   isUploadModalOpen: boolean
   pipelineState: PipelineState
-  presentationPlan: PresentationPlan | null
   setActiveModule: (module: Module) => void
   setActiveDimension: (dim: Dimension) => void
   setProbation: (data: ProbationEmployee[] | null) => void
@@ -111,6 +106,5 @@ export interface AppState {
   togglePipelineMappingOverride: () => void
   setFieldOverrides: (module: string, overrides: Record<number, SemanticFieldType>) => void
   resetPipeline: () => void
-  setPresentationPlan: (plan: PresentationPlan | null) => void
   reset: () => void
 }
