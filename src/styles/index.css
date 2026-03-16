@@ -74,3 +74,22 @@ textarea:focus-visible {
   font-size: 0.875rem;
   padding: 0.375rem 0.75rem;
 }
+
+/* ── Print styles for executive dashboard ───────────────────────── */
+@media print {
+  /* Hide interactive chrome */
+  .print\:hidden { display: none !important; }
+
+  /* Remove shadows, keep borders */
+  * { box-shadow: none !important; }
+
+  /* Ensure white backgrounds for all cards */
+  body { background: white !important; }
+
+  /* Force colour backgrounds to print */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Page break helpers */
+  .page-break-before { page-break-before: always; }
+  .page-break-avoid  { page-break-inside: avoid; }
+}

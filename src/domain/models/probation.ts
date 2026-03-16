@@ -3,9 +3,11 @@ export interface ProbationEmployee {
   id: string
   period: string
   manager: string
-  selfAssess: number | null
+  selfStatus: string | null   // text: Completed / Not Started / In Progress / Skipped
+  selfScore: number | null    // numeric score 0–10 if present in the sheet
   selfDate: string | null
-  mgrAssess: number | null
+  mgrStatus: string | null
+  mgrScore: number | null
   mgrDate: string | null
   notes: string | null
 }
@@ -14,13 +16,20 @@ export type ProbationStatus = 'Completed' | 'In Progress' | 'Not Started' | 'Ski
 
 export function getStatusKey(status: string | null | undefined): ProbationStatus {
   if (!status || typeof status !== 'string') return 'Not Started'
-  const normalized = status.trim().toLowerCase()
-  if (normalized === 'completed') return 'Completed'
-  if (normalized === 'in progress') return 'In Progress'
-  if (normalized === 'skipped') return 'Skipped'
+  const n = status.trim().toLowerCase()
+  if (n === 'completed' || n === 'complete') return 'Completed'
+  if (n === 'in progress' || n === 'in-progress') return 'In Progress'
+  if (n === 'skipped') return 'Skipped'
   return 'Not Started'
 }
 
-export function assessmentIsComplete(assessment: number | null, date: string | null): boolean {
-  return assessment !== null && assessment >= 0 && date !== null && date.trim().length > 0
+export function assessmentIsComplete(status: string | null | undefined): boolean {
+  return getStatusKey(status) === 'Completed'
+}
+
+export const STATUS_COLORS: Record<ProbationStatus, { bg: string; fg: string }> = {
+  Completed: { bg: '#15803D', fg: '#ffffff' },
+  'In Progress': { bg: '#F59E0B', fg: '#1a2433' },
+  'Not Started': { bg: '#f3f4f6', fg: '#6b7280' },
+  Skipped: { bg: '#6b7280', fg: '#ffffff' }
 }

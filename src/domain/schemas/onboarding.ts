@@ -1,16 +1,9 @@
 import { z } from 'zod'
 
-export const OnboardingRatingSchema = z.object({
-  yes: z.number().min(0),
-  no: z.number().min(0)
-})
-
-export type OnboardingRatingSchemaType = z.infer<typeof OnboardingRatingSchema>
-
 export const OnboardingResponseSchema = z.object({
   id: z.string().min(1),
-  all: OnboardingRatingSchema,
-  byDimension: z.record(z.string(), OnboardingRatingSchema)
+  allScore: z.number().nullable(),
+  scores: z.record(z.string(), z.number().nullable())
 })
 
 export type OnboardingResponseSchemaType = z.infer<typeof OnboardingResponseSchema>
@@ -32,6 +25,7 @@ export const OnboardingDashboardDataSchema = z.object({
     )
   ),
   responses: z.array(OnboardingResponseSchema),
+  totalRespondents: z.number(),
   visibleQuestions: z.array(z.string())
 })
 

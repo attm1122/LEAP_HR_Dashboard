@@ -6,9 +6,8 @@ import {
   flexRender,
   ColumnDef
 } from '@tanstack/react-table'
-import { ProbationEmployee } from '@/domain/models/probation'
+import { ProbationEmployee, getStatusKey, STATUS_COLORS } from '@/domain/models/probation'
 import { formatDate } from '@/lib/dates/parsing'
-import { scoreColor } from '@/lib/colour/score'
 
 interface ProbationTableProps {
   data: ProbationEmployee[]
@@ -31,48 +30,54 @@ const ProbationTable: React.FC<ProbationTableProps> = ({ data }) => {
         header: 'Manager'
       },
       {
-        accessorKey: 'selfAssess',
+        accessorKey: 'period',
+        header: 'Period'
+      },
+      {
+        accessorKey: 'selfStatus',
         header: 'Self Assessment',
         cell: (info) => {
-          const value = info.getValue() as number | null
-          if (value === null) return '—'
-          const { bg, fg } = scoreColor(value)
+          const raw = info.getValue() as string | null
+          if (!raw) return <span className="text-text-muted">—</span>
+          const key = getStatusKey(raw)
+          const { bg, fg } = STATUS_COLORS[key]
           return (
             <span
-              className="score-badge"
+              className="inline-block rounded-full px-3 py-1 text-xs font-semibold"
               style={{ backgroundColor: bg, color: fg }}
             >
-              {value.toFixed(1)}/10
+              {key}
             </span>
           )
         }
       },
       {
         accessorKey: 'selfDate',
-        header: 'Self Assessment Date',
-        cell: (info) => formatDate(info.getValue() as string | null)
+        header: 'Self Date',
+        cell: (info) => formatDate(info.getValue() as string | null) || '—'
       },
       {
-        accessorKey: 'mgrAssess',
+        accessorKey: 'mgrStatus',
         header: 'Manager Assessment',
         cell: (info) => {
-          const value = info.getValue() as number | null
-          if (value === null) return '—'
-          const { bg, fg } = scoreColor(value)
+          const raw = info.getValue() as string | null
+          if (!raw) return <span className="text-text-muted">—</span>
+          const key = getStatusKey(raw)
+          const { bg, fg } = STATUS_COLORS[key]
           return (
             <span
-              className="score-badge"
+              className="inline-block rounded-full px-3 py-1 text-xs font-semibold"
               style={{ backgroundColor: bg, color: fg }}
             >
-              {value.toFixed(1)}/10
+              {key}
             </span>
           )
         }
       },
       {
         accessorKey: 'mgrDate',
-        header: 'Manager Assessment Date',
-        cell: (info) => formatDate(info.getValue() as string | null)
+        header: 'Manager Date',
+        cell: (info) => formatDate(info.getValue() as string | null) || '—'
       },
       {
         accessorKey: 'notes',

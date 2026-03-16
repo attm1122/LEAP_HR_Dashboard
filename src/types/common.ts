@@ -1,18 +1,25 @@
+import type { PipelineResult, PipelineStage, PipelineError, SemanticFieldType } from '@/pipeline/types'
+import type { PresentationPlan } from '@/presentation/types'
+
 export type Module = 'probation' | 'onboarding' | 'offboarding'
 export type Dimension = 'bu' | 'loc' | 'ten'
 
+// ── Probation ──────────────────────────────────────────────────────────────────
 export interface ProbationEmployee {
   name: string
   id: string
   period: string
   manager: string
-  selfAssess: number | null
+  selfStatus: string | null    // text: Completed / Not Started / In Progress / Skipped
+  selfScore: number | null     // numeric score 0-10 when present
   selfDate: string | null
-  mgrAssess: number | null
+  mgrStatus: string | null
+  mgrScore: number | null
   mgrDate: string | null
   notes: string | null
 }
 
+// ── Onboarding ─────────────────────────────────────────────────────────────────
 export interface OnboardingQuestion {
   id: string
   text: string
@@ -23,24 +30,21 @@ export interface OnboardingDimension {
   count: number
 }
 
-export interface OnboardingRating {
-  yes: number
-  no: number
-}
-
 export interface OnboardingResponse {
   id: string
-  all: OnboardingRating
-  byDimension: Record<string, OnboardingRating>
+  allScore: number | null
+  scores: Record<string, number | null>
 }
 
 export interface OnboardingDashboardData {
   questions: OnboardingQuestion[]
   dimensions: Record<string, OnboardingDimension[]>
   responses: OnboardingResponse[]
+  totalRespondents: number
   visibleQuestions: string[]
 }
 
+// ── Offboarding ────────────────────────────────────────────────────────────────
 export interface OffboardingResponse {
   id: string
   ratingValue: number | null
@@ -50,6 +54,23 @@ export interface OffboardingResponse {
   ratings: Record<string, number>
 }
 
+// Re-export so store can import from one place
+export type { PresentationPlan }
+
+// ── Pipeline State ────────────────────────────────────────────────────────────
+export interface PipelineState {
+  stage: PipelineStage
+  currentFile: string | null
+  result: PipelineResult | null
+  errors: PipelineError[]
+  warnings: any[]
+  isRunning: boolean
+  showDiagnostics: boolean
+  showMappingOverride: boolean
+  fieldOverrides: Record<string, Record<number, SemanticFieldType>>
+}
+
+// ── App State ──────────────────────────────────────────────────────────────────
 export interface AppState {
   probation: ProbationEmployee[] | null
   onboarding: OnboardingDashboardData | null
@@ -70,6 +91,8 @@ export interface AppState {
     driver: string
   }
   isUploadModalOpen: boolean
+  pipelineState: PipelineState
+  presentationPlan: PresentationPlan | null
   setActiveModule: (module: Module) => void
   setActiveDimension: (dim: Dimension) => void
   setProbation: (data: ProbationEmployee[] | null) => void
@@ -81,5 +104,13 @@ export interface AppState {
   setProbationFilters: (filters: Partial<AppState['probationFilters']>) => void
   setOffboardingFilters: (filters: Partial<AppState['offboardingFilters']>) => void
   setIsUploadModalOpen: (open: boolean) => void
+  setPipelineStage: (stage: PipelineStage) => void
+  setPipelineResult: (result: PipelineResult | null) => void
+  setPipelineErrors: (errors: PipelineError[]) => void
+  togglePipelineDiagnostics: () => void
+  togglePipelineMappingOverride: () => void
+  setFieldOverrides: (module: string, overrides: Record<number, SemanticFieldType>) => void
+  resetPipeline: () => void
+  setPresentationPlan: (plan: PresentationPlan | null) => void
   reset: () => void
 }

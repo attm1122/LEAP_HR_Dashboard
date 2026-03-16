@@ -12,15 +12,11 @@ export function useProbationFilters(): ProbationEmployee[] {
     return probation.filter((emp) => {
       if (manager && emp.manager !== manager) return false
 
-      if (selfStatus === 'completed' && !assessmentIsComplete(emp.selfAssess, emp.selfDate))
-        return false
-      if (selfStatus === 'pending' && assessmentIsComplete(emp.selfAssess, emp.selfDate))
-        return false
+      if (selfStatus === 'completed' && !assessmentIsComplete(emp.selfStatus)) return false
+      if (selfStatus === 'pending' && assessmentIsComplete(emp.selfStatus)) return false
 
-      if (mgrStatus === 'completed' && !assessmentIsComplete(emp.mgrAssess, emp.mgrDate))
-        return false
-      if (mgrStatus === 'pending' && assessmentIsComplete(emp.mgrAssess, emp.mgrDate))
-        return false
+      if (mgrStatus === 'completed' && !assessmentIsComplete(emp.mgrStatus)) return false
+      if (mgrStatus === 'pending' && assessmentIsComplete(emp.mgrStatus)) return false
 
       if (search) {
         const searchLower = search.toLowerCase()

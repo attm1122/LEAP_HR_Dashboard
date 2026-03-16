@@ -5,14 +5,10 @@ import { getCellOrNull } from '@/parsers/core/workbook'
 export function parseOffboardingData(rows: unknown[][]): OffboardingResponse[] {
   const responses: OffboardingResponse[] = []
 
-  if (rows.length < 2) {
-    return responses
-  }
+  if (rows.length < 2) return responses
 
   const headerRow = rows[0]
-  if (!headerRow) {
-    return responses
-  }
+  if (!headerRow) return responses
 
   const headers = (headerRow as unknown[]).map((h) => getCellOrNull([h], 0) || '')
 
@@ -20,9 +16,7 @@ export function parseOffboardingData(rows: unknown[][]): OffboardingResponse[] {
   let buColIdx = -1
   let tenureColIdx = -1
   let driverColIdx = -1
-  const ratingColIndices: number[] = []
-
-  const ratingPattern = /^(i |my |people |our |client |day-to-day|it.?s clear)/i
+  const metadataCols = new Set<number>()
 
   for (let col = 0; col < headers.length; col++) {
     const header = headers[col]
@@ -30,19 +24,44 @@ export function parseOffboardingData(rows: unknown[][]): OffboardingResponse[] {
 
     if (/^id$|employee.?id|respondent/i.test(header)) {
       idColIdx = col
+      metadataCols.add(col)
     } else if (/business.?unit/i.test(header)) {
       buColIdx = col
+      metadataCols.add(col)
     } else if (/tenure|length.?service|years/i.test(header)) {
       tenureColIdx = col
-    } else if (/reason|driver|leaving|why/i.test(header)) {
+      metadataCols.add(col)
+    } else if (/reason|driver|leaving|why|departure/i.test(header)) {
       driverColIdx = col
-    } else if (ratingPattern.test(header)) {
-      ratingColIndices.push(col)
+      metadataCols.add(col)
     }
   }
 
   if (idColIdx === -1) {
     idColIdx = 0
+    metadataCols.add(0)
+  }
+
+  // Identify rating columns: any non-metadata column that has Likert-like values
+  // in the first few data rows.
+  const ratingColIndices: number[] = []
+  for (let col = 0; col < headers.length; col++) {
+    if (metadataCols.has(col)) continue
+    const header = headers[col]
+    if (!header || header.trim() === '') continue
+
+    // Check if this column has parseable Likert values in at least one of the first 5 rows
+    let hasLikert = false
+    for (let row = 1; row < Math.min(rows.length, 6); row++) {
+      const val = getCellOrNull(rows[row] as unknown[], col)
+      if (val !== null && parseLikertValue(val) !== null) {
+        hasLikert = true
+        break
+      }
+    }
+    if (hasLikert) {
+      ratingColIndices.push(col)
+    }
   }
 
   for (let row = 1; row < rows.length; row++) {
@@ -55,7 +74,7 @@ export function parseOffboardingData(rows: unknown[][]): OffboardingResponse[] {
     const driver = driverColIdx !== -1 ? getCellOrNull(rowData as unknown[], driverColIdx) : null
 
     const ratings: Record<string, number> = {}
-    let allRatings: number[] = []
+    const allRatings: number[] = []
 
     for (const colIdx of ratingColIndices) {
       const cellValue = getCellOrNull(rowData as unknown[], colIdx)
@@ -69,17 +88,11 @@ export function parseOffboardingData(rows: unknown[][]): OffboardingResponse[] {
 
     let ratingValue: number | null = null
     if (allRatings.length > 0) {
-      ratingValue = Math.round((allRatings.reduce((a, b) => a + b, 0) / allRatings.length) * 10) / 10
+      ratingValue =
+        Math.round((allRatings.reduce((a, b) => a + b, 0) / allRatings.length) * 10) / 10
     }
 
-    responses.push({
-      id,
-      ratingValue,
-      bu,
-      tenure,
-      driver,
-      ratings
-    })
+    responses.push({ id, ratingValue, bu, tenure, driver, ratings })
   }
 
   return responses

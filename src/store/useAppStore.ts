@@ -7,6 +7,8 @@ import type {
   Module,
   Dimension
 } from '@/types/common'
+import type { PipelineResult, PipelineStage, PipelineError, SemanticFieldType } from '@/pipeline/types'
+import type { PresentationPlan } from '@/presentation/types'
 
 const initialState = {
   probation: null as ProbationEmployee[] | null,
@@ -27,7 +29,19 @@ const initialState = {
     tenure: '',
     driver: ''
   },
-  isUploadModalOpen: false
+  isUploadModalOpen: false,
+  pipelineState: {
+    stage: 'idle' as PipelineStage,
+    currentFile: null as string | null,
+    result: null as PipelineResult | null,
+    errors: [] as PipelineError[],
+    warnings: [] as any[],
+    isRunning: false,
+    showDiagnostics: false,
+    showMappingOverride: false,
+    fieldOverrides: {} as Record<string, Record<number, SemanticFieldType>>
+  },
+  presentationPlan: null as PresentationPlan | null,
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -71,6 +85,49 @@ export const useAppStore = create<AppState>((set) => ({
     })),
 
   setIsUploadModalOpen: (open: boolean) => set({ isUploadModalOpen: open }),
+
+  setPipelineStage: (stage: PipelineStage) =>
+    set((state) => ({
+      pipelineState: { ...state.pipelineState, stage }
+    })),
+
+  setPipelineResult: (result: PipelineResult | null) =>
+    set((state) => ({
+      pipelineState: { ...state.pipelineState, result }
+    })),
+
+  setPipelineErrors: (errors: PipelineError[]) =>
+    set((state) => ({
+      pipelineState: { ...state.pipelineState, errors }
+    })),
+
+  togglePipelineDiagnostics: () =>
+    set((s) => ({
+      pipelineState: { ...s.pipelineState, showDiagnostics: !s.pipelineState.showDiagnostics }
+    })),
+
+  togglePipelineMappingOverride: () =>
+    set((s) => ({
+      pipelineState: { ...s.pipelineState, showMappingOverride: !s.pipelineState.showMappingOverride }
+    })),
+
+  setFieldOverrides: (module: string, overrides: Record<number, SemanticFieldType>) =>
+    set((s) => ({
+      pipelineState: {
+        ...s.pipelineState,
+        fieldOverrides: {
+          ...s.pipelineState.fieldOverrides,
+          [module]: overrides
+        }
+      }
+    })),
+
+  resetPipeline: () =>
+    set(() => ({
+      pipelineState: { ...initialState.pipelineState }
+    })),
+
+  setPresentationPlan: (plan: PresentationPlan | null) => set({ presentationPlan: plan }),
 
   reset: () => set(initialState)
 }))

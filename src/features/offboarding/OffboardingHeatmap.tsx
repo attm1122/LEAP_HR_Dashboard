@@ -20,11 +20,17 @@ const OffboardingHeatmap: React.FC<OffboardingHeatmapProps> = ({ data }) => {
     const columnLabels = Array.from(allRatingKeys).sort()
 
     const tableData = data.slice(0, 20).map((resp) => {
-      const cells = columnLabels.map((label) => ({
-        label,
-        value: resp.ratings[label] !== undefined ? resp.ratings[label] / 5 : null,
-        isYesNo: false
-      }))
+      const cells = columnLabels.map((label) => {
+        const raw = resp.ratings[label]
+        return {
+          label,
+          // Normalise to 0-1 for the colour scale (Likert is 1-5)
+          value: raw !== undefined ? raw / 5 : null,
+          // Display the raw integer score, not a percentage
+          displayValue: raw !== undefined ? String(Math.round(raw)) : undefined,
+          isYesNo: false as const
+        }
+      })
 
       return {
         name: `${resp.id}${resp.driver ? ` (${resp.driver})` : ''}`,

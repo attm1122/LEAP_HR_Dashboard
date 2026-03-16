@@ -9,45 +9,31 @@ interface OnboardingHeatmapProps {
 }
 
 const OnboardingHeatmap: React.FC<OnboardingHeatmapProps> = ({ data, activeDimension }) => {
-  const dimensionMap: Record<Dimension, string> = {
-    bu: 'bu',
-    loc: 'loc',
-    ten: 'ten'
-  }
-
   const { tableData, columnLabels } = useMemo(() => {
-    if (!data) {
+    if (!data || data.questions.length === 0) {
       return { tableData: [], columnLabels: [] }
     }
 
-    const dimKey = dimensionMap[activeDimension]
+    const dimKey = activeDimension
     const dimensions = data.dimensions[dimKey] || []
-
     const columnLabels = dimensions.map((d) => d.value)
 
     const tableData = data.questions.map((question) => {
       const response = data.responses.find((r) => r.id === question.id)
 
       const cells = columnLabels.map((dimValue) => {
-        if (!response) {
-          return { label: dimValue, value: null, isYesNo: true }
+        const score = response?.scores[dimValue] ?? null
+        return {
+          label: dimValue,
+          // Normalise to 0-1 for the colour scale (scores are 1-5)
+          value: score !== null ? score / 5 : null,
+          // Show the raw score (e.g. "4.2") not a percentage
+          displayValue: score !== null ? score.toFixed(2) : undefined,
+          isYesNo: false as const
         }
-
-        const dimData = response.byDimension[dimValue]
-        if (!dimData) {
-          return { label: dimValue, value: null, isYesNo: true }
-        }
-
-        const total = dimData.yes + dimData.no
-        const rate = total > 0 ? dimData.yes / total : 0
-
-        return { label: dimValue, value: rate, isYesNo: true }
       })
 
-      return {
-        name: question.text,
-        cells
-      }
+      return { name: question.text, cells }
     })
 
     return { tableData, columnLabels }
@@ -62,7 +48,7 @@ const OnboardingHeatmap: React.FC<OnboardingHeatmapProps> = ({ data, activeDimen
       <HeatmapTable
         rows={tableData}
         columnLabels={columnLabels}
-        title="Response Rate by Dimension"
+        title={`Average Score by ${activeDimension === 'bu' ? 'Business Unit' : activeDimension === 'loc' ? 'Location' : 'Tenure'}`}
       />
     </div>
   )

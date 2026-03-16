@@ -1,19 +1,32 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 import PageContainer from '@/components/layout/PageContainer'
 import EmptyState from '@/components/feedback/EmptyState'
 import DimToggle from '@/components/filters/DimToggle'
 import FilterBar from '@/components/filters/FilterBar'
-import OnboardingKPIs from './OnboardingKPIs'
-import OnboardingCharts from './OnboardingCharts'
 import OnboardingHeatmap from './OnboardingHeatmap'
 import type { Dimension } from '@/types/common'
+import ExecutiveDashboardLayout from '@/features/executive/ExecutiveDashboardLayout'
+import { planOnboarding } from '@/presentation/presentation-planner'
 
 const OnboardingDashboard: React.FC = () => {
-  const { onboarding, activeDimension, setActiveDimension, setIsUploadModalOpen } =
-    useAppStore()
+  const {
+    onboarding,
+    activeDimension,
+    setActiveDimension,
+    setIsUploadModalOpen,
+    pipelineState,
+  } = useAppStore()
 
-  if (!onboarding) {
+  const plan = useMemo(
+    () => (onboarding ? planOnboarding(onboarding) : null),
+    [onboarding]
+  )
+
+  const detection = pipelineState.result?.detectionResult
+  const fileName = pipelineState.result?.workbook.fileName
+
+  if (!onboarding || !plan) {
     return (
       <PageContainer>
         <EmptyState
@@ -37,22 +50,20 @@ const OnboardingDashboard: React.FC = () => {
 
   return (
     <PageContainer>
-      <div className="space-y-8">
-        <OnboardingKPIs data={onboarding} />
+      <ExecutiveDashboardLayout plan={plan} detection={detection} fileName={fileName}>
+        <div className="p-6 space-y-6">
+          <FilterBar title="Filters">
+            <DimToggle
+              label="View By"
+              value={activeDimension}
+              onChange={setActiveDimension}
+              options={dimensions}
+            />
+          </FilterBar>
 
-        <FilterBar title="Filters">
-          <DimToggle
-            label="View By"
-            value={activeDimension}
-            onChange={setActiveDimension}
-            options={dimensions}
-          />
-        </FilterBar>
-
-        <OnboardingCharts data={onboarding} activeDimension={activeDimension} />
-
-        <OnboardingHeatmap data={onboarding} activeDimension={activeDimension} />
-      </div>
+          <OnboardingHeatmap data={onboarding} activeDimension={activeDimension} />
+        </div>
+      </ExecutiveDashboardLayout>
     </PageContainer>
   )
 }

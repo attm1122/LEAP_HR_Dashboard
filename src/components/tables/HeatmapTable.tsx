@@ -1,10 +1,17 @@
 import React from 'react'
-import { scoreColor } from '@/lib/colour/score'
+import { obRatingColor, scoreColor } from '@/lib/colour/score'
 import { formatPercent } from '@/lib/formatting/numbers'
 
-interface HeatmapCell {
+export interface HeatmapCell {
   label: string
+  /** Normalised value in the range 0-1 used to drive the colour scale. */
   value: number | null
+  /**
+   * Optional override for what is displayed in the cell.
+   * If omitted, falls back to formatPercent(value).
+   */
+  displayValue?: string
+  /** When true, the cell is coloured as a yes/no rate (green if > 50%, grey otherwise). */
   isYesNo?: boolean
 }
 
@@ -30,7 +37,7 @@ const HeatmapTable: React.FC<HeatmapTableProps> = ({ rows, columnLabels, title }
       <table className="w-full border-collapse bg-surface">
         <thead>
           <tr className="border-b-2 border-border">
-            <th className="sticky left-0 min-w-[320px] bg-accent px-4 py-3 text-left font-bold text-white">
+            <th className="sticky left-0 min-w-[280px] bg-accent px-4 py-3 text-left font-bold text-white">
               Question
             </th>
             {columnLabels.map((label, idx) => (
@@ -45,25 +52,40 @@ const HeatmapTable: React.FC<HeatmapTableProps> = ({ rows, columnLabels, title }
         </thead>
         <tbody>
           {rows.map((row, ridx) => (
-            <tr
-              key={ridx}
-              className="border-b border-border hover:brightness-95"
-              style={{ filter: 'brightness(1)' }}
-            >
+            <tr key={ridx} className="border-b border-border hover:brightness-95">
               <td className="sticky left-0 bg-surface px-4 py-3 font-medium text-text-primary">
                 {row.name}
               </td>
               {row.cells.map((cell, cidx) => {
-                const { bg, fg } = scoreColor(cell.value, cell.isYesNo)
-                const displayValue = cell.value !== null ? formatPercent(cell.value) : '—'
+                // Pick the right colour function based on value range and mode
+                let bg: string
+                let fg: string
+
+                if (cell.value === null) {
+                  bg = '#f3f4f6'
+                  fg = '#9ca3af'
+                } else if (cell.isYesNo) {
+                  // Yes/No rate: value is already 0-1
+                  ;({ bg, fg } = scoreColor(cell.value, true))
+                } else {
+                  // Numeric score: value is normalised 0-1 — use the 0-1 colour scale
+                  ;({ bg, fg } = obRatingColor(cell.value))
+                }
+
+                const displayText =
+                  cell.displayValue !== undefined
+                    ? cell.displayValue
+                    : cell.value !== null
+                    ? formatPercent(cell.value)
+                    : '—'
 
                 return (
                   <td
                     key={cidx}
-                    className="heatmap-cell border-l border-border text-center"
+                    className="heatmap-cell border-l border-border px-3 py-3 text-center text-sm font-semibold"
                     style={{ backgroundColor: bg, color: fg }}
                   >
-                    {displayValue}
+                    {displayText}
                   </td>
                 )
               })}

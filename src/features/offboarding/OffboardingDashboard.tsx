@@ -4,15 +4,20 @@ import PageContainer from '@/components/layout/PageContainer'
 import EmptyState from '@/components/feedback/EmptyState'
 import FilterBar from '@/components/filters/FilterBar'
 import SelectFilter from '@/components/filters/SelectFilter'
-import OffboardingKPIs from './OffboardingKPIs'
-import OffboardingCharts from './OffboardingCharts'
 import OffboardingHeatmap from './OffboardingHeatmap'
-import OffboardingCards from './OffboardingCards'
 import { useOffboardingFilters } from './hooks/useOffboardingFilters'
+import ExecutiveDashboardLayout from '@/features/executive/ExecutiveDashboardLayout'
+import { planOffboarding } from '@/presentation/presentation-planner'
 
 const OffboardingDashboard: React.FC = () => {
-  const { offboarding, offboardingFilters, setOffboardingFilters, setIsUploadModalOpen } =
-    useAppStore()
+  const {
+    offboarding,
+    offboardingFilters,
+    setOffboardingFilters,
+    setIsUploadModalOpen,
+    pipelineState,
+  } = useAppStore()
+
   const filteredData = useOffboardingFilters()
 
   const filterOptions = useMemo(() => {
@@ -35,7 +40,16 @@ const OffboardingDashboard: React.FC = () => {
     return { bu, tenure, driver }
   }, [offboarding])
 
-  if (!offboarding) {
+  // Plan is derived from the FULL dataset so KPIs reflect the whole picture
+  const plan = useMemo(
+    () => (offboarding ? planOffboarding(offboarding) : null),
+    [offboarding]
+  )
+
+  const detection = pipelineState.result?.detectionResult
+  const fileName = pipelineState.result?.workbook.fileName
+
+  if (!offboarding || !plan) {
     return (
       <PageContainer>
         <EmptyState
@@ -53,36 +67,32 @@ const OffboardingDashboard: React.FC = () => {
 
   return (
     <PageContainer>
-      <div className="space-y-8">
-        <OffboardingKPIs data={offboarding} />
+      <ExecutiveDashboardLayout plan={plan} detection={detection} fileName={fileName}>
+        <div className="p-6 space-y-6">
+          <FilterBar title="Filters">
+            <SelectFilter
+              label="Business Unit"
+              value={offboardingFilters.bu}
+              onChange={(bu) => setOffboardingFilters({ bu })}
+              options={filterOptions.bu}
+            />
+            <SelectFilter
+              label="Tenure"
+              value={offboardingFilters.tenure}
+              onChange={(tenure) => setOffboardingFilters({ tenure })}
+              options={filterOptions.tenure}
+            />
+            <SelectFilter
+              label="Exit Driver"
+              value={offboardingFilters.driver}
+              onChange={(driver) => setOffboardingFilters({ driver })}
+              options={filterOptions.driver}
+            />
+          </FilterBar>
 
-        <FilterBar title="Filters">
-          <SelectFilter
-            label="Business Unit"
-            value={offboardingFilters.bu}
-            onChange={(bu) => setOffboardingFilters({ bu })}
-            options={filterOptions.bu}
-          />
-          <SelectFilter
-            label="Tenure"
-            value={offboardingFilters.tenure}
-            onChange={(tenure) => setOffboardingFilters({ tenure })}
-            options={filterOptions.tenure}
-          />
-          <SelectFilter
-            label="Exit Driver"
-            value={offboardingFilters.driver}
-            onChange={(driver) => setOffboardingFilters({ driver })}
-            options={filterOptions.driver}
-          />
-        </FilterBar>
-
-        <OffboardingCards data={offboarding} />
-
-        <OffboardingCharts data={filteredData} />
-
-        <OffboardingHeatmap data={filteredData} />
-      </div>
+          <OffboardingHeatmap data={filteredData} />
+        </div>
+      </ExecutiveDashboardLayout>
     </PageContainer>
   )
 }
