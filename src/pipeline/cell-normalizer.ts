@@ -1,5 +1,27 @@
 import type { NormalizedCell, CellValueKind } from './types'
 
+// ── Likert scale map (Strongly Agree…Strongly Disagree → 1–5) ───────────────
+// Parsed BEFORE status so these values get a parsedNumber rather than a
+// normalizedStatus, making them detectable as survey-score by the profiler.
+const LIKERT_SCORES: Record<string, number> = {
+  'strongly agree':    5,
+  'strongly agrees':   5,
+  'agree':             4,
+  'agrees':            4,
+  'somewhat agree':    4,
+  'neutral':           3,
+  'neither agree nor disagree': 3,
+  'disagree':          2,
+  'disagrees':         2,
+  'somewhat disagree': 2,
+  'strongly disagree': 1,
+  'strongly disagrees':1,
+}
+
+function tryParseLikert(trimmed: string): number | null {
+  return LIKERT_SCORES[trimmed.toLowerCase()] ?? null
+}
+
 // ── Canonical status map ─────────────────────────────────────────────────────
 const STATUS_NORMALIZATION: Record<string, string> = {
   completed: 'Completed',
@@ -174,6 +196,12 @@ export function normalizeCell(raw: unknown): NormalizedCell {
     const boolVal = tryParseBoolean(trimmed)
     if (boolVal !== null) {
       return { raw, text, trimmed, kind: 'boolean-string', parsedBoolean: boolVal, isEmptyLike: false }
+    }
+
+    // 6.5 Likert scale strings — parsed BEFORE status so they get a parsedNumber
+    const likertVal = tryParseLikert(trimmed)
+    if (likertVal !== null) {
+      return { raw, text, trimmed, kind: 'numeric-string', parsedNumber: likertVal, isEmptyLike: false }
     }
 
     // 7. Status strings ("Completed", "In Progress", etc.)

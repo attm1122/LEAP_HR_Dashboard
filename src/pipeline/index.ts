@@ -70,8 +70,13 @@ export async function runPipeline(
       return result
     }
 
-    // Select first sheet
-    const sheetName = workbook.sheetNames[0]
+    // Select the most useful sheet.
+    // The onboarding file has a "Transform" sheet with clean respondent rows;
+    // the probation file uses "Assessment Progress"; offboarding uses "Sheet1".
+    const PREFERRED_SHEETS = ['Transform', 'Raw Data', 'Assessment Progress', 'Sheet1']
+    const sheetName =
+      PREFERRED_SHEETS.find((n) => workbook.sheetNames.includes(n)) ??
+      workbook.sheetNames[0]
     if (!sheetName) {
       result.errors.push({
         stage: 'reading',

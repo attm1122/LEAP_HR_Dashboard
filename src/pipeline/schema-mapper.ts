@@ -74,10 +74,15 @@ function mapToProbation(
   const employees: ProbationEmployee[] = []
 
   // Find field indices
-  const nameIdx = fields.findIndex((f) => f.semanticType === 'person-name')
-  const idIdx = fields.findIndex((f) => f.semanticType === 'identifier')
-  const periodIdx = fields.findIndex((f) => f.semanticType === 'probation-period')
+  const nameIdx    = fields.findIndex((f) => f.semanticType === 'person-name')
+  const idIdx      = fields.findIndex((f) => f.semanticType === 'identifier')
+  const periodIdx  = fields.findIndex((f) => f.semanticType === 'probation-period')
   const managerIdx = fields.findIndex((f) => f.semanticType === 'manager-name')
+
+  // LEAP's probation file has names in the "Employee Number" column (col 0)
+  // on alternating name rows.  Fall back to idIdx (col 0) when no person-name
+  // column exists.
+  const effectiveNameIdx = nameIdx >= 0 ? nameIdx : idIdx
 
   // Find assessment fields (self and manager)
   const selfStatusIdx = fields.findIndex(
@@ -103,52 +108,71 @@ function mapToProbation(
     (f) => f.semanticType === 'date' && f.header.toLowerCase().includes('manager')
   )
 
-  // Process rows (skip header)
-  for (let i = 1; i < rows.length; i++) {
+  // Notes index: column after the last date field (or last field)
+  const notesIdx = (() => {
+    const notesField = fields.findIndex((f) => f.semanticType === 'comment-text')
+    if (notesField >= 0) return notesField
+    const lastDate = Math.max(selfDateIdx, mgrDateIdx)
+    return lastDate >= 0 ? lastDate + 1 : -1
+  })()
+
+  // Process rows (skip header row 0 — rows array already starts from row index 1
+  // of the sheet, so we iterate from index 0 here which is sheet row 1).
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
 
-    // Check if row is empty or is a name-only row (probation alternate row pattern)
-    const hasNameOnly = nameIdx >= 0 && !row[nameIdx]?.isEmptyLike && allOtherEmpty(row, nameIdx)
-    if (hasNameOnly && i + 1 < rows.length) {
-      // This is a name row, next row is data
+    // Skip completely empty rows
+    if (row.every((c) => c.isEmptyLike)) continue
+
+    // Detect name-only row: effectiveNameIdx cell is non-empty, all others empty.
+    // This handles LEAP's alternating-row format where employee names appear on
+    // their own row and data follows on the next row.
+    const isNameRow =
+      effectiveNameIdx >= 0 &&
+      !row[effectiveNameIdx]?.isEmptyLike &&
+      allOtherEmpty(row, effectiveNameIdx)
+
+    if (isNameRow && i + 1 < rows.length) {
       const dataRow = rows[i + 1]
-      const name = row[nameIdx]?.trimmed || ''
+      const name    = row[effectiveNameIdx]?.trimmed || ''
+
+      // In the data row col 0 may be the employee ID (or empty if not assigned)
+      const id = nameIdx >= 0 ? (dataRow[idIdx]?.trimmed || '') : (dataRow[idIdx]?.trimmed || '')
 
       const emp: ProbationEmployee = {
         name,
-        id: dataRow[idIdx]?.trimmed || '',
-        period: dataRow[periodIdx]?.trimmed || '',
-        manager: dataRow[managerIdx]?.trimmed || '',
+        id,
+        period:     dataRow[periodIdx]?.trimmed  || '',
+        manager:    dataRow[managerIdx]?.trimmed  || '',
         selfStatus: dataRow[selfStatusIdx]?.normalizedStatus || null,
-        selfScore: dataRow[selfScoreIdx]?.parsedNumber ?? null,
-        selfDate: dataRow[selfDateIdx]?.parsedDate ?? null,
-        mgrStatus: dataRow[mgrStatusIdx]?.normalizedStatus || null,
-        mgrScore: dataRow[mgrScoreIdx]?.parsedNumber ?? null,
-        mgrDate: dataRow[mgrDateIdx]?.parsedDate ?? null,
-        notes: dataRow[Math.max(selfDateIdx, mgrDateIdx) + 1]?.trimmed || null
+        selfScore:  dataRow[selfScoreIdx]?.parsedNumber  ?? null,
+        selfDate:   dataRow[selfDateIdx]?.parsedDate    ?? null,
+        mgrStatus:  dataRow[mgrStatusIdx]?.normalizedStatus  || null,
+        mgrScore:   dataRow[mgrScoreIdx]?.parsedNumber   ?? null,
+        mgrDate:    dataRow[mgrDateIdx]?.parsedDate     ?? null,
+        notes:      notesIdx >= 0 ? (dataRow[notesIdx]?.trimmed || null) : null
       }
 
       employees.push(emp)
-      i++ // Skip the data row since we just processed it
+      i++ // skip the data row
       continue
     }
 
-    // Flat row pattern
+    // Flat row pattern (single row per employee, person-name column present)
     if (nameIdx >= 0 && !row[nameIdx]?.isEmptyLike) {
       const emp: ProbationEmployee = {
-        name: row[nameIdx]?.trimmed || '',
-        id: row[idIdx]?.trimmed || '',
-        period: row[periodIdx]?.trimmed || '',
-        manager: row[managerIdx]?.trimmed || '',
+        name:       row[nameIdx]?.trimmed  || '',
+        id:         row[idIdx]?.trimmed    || '',
+        period:     row[periodIdx]?.trimmed  || '',
+        manager:    row[managerIdx]?.trimmed  || '',
         selfStatus: row[selfStatusIdx]?.normalizedStatus || null,
-        selfScore: row[selfScoreIdx]?.parsedNumber ?? null,
-        selfDate: row[selfDateIdx]?.parsedDate ?? null,
-        mgrStatus: row[mgrStatusIdx]?.normalizedStatus || null,
-        mgrScore: row[mgrScoreIdx]?.parsedNumber ?? null,
-        mgrDate: row[mgrDateIdx]?.parsedDate ?? null,
-        notes: row[Math.max(selfDateIdx, mgrDateIdx) + 1]?.trimmed || null
+        selfScore:  row[selfScoreIdx]?.parsedNumber  ?? null,
+        selfDate:   row[selfDateIdx]?.parsedDate    ?? null,
+        mgrStatus:  row[mgrStatusIdx]?.normalizedStatus  || null,
+        mgrScore:   row[mgrScoreIdx]?.parsedNumber   ?? null,
+        mgrDate:    row[mgrDateIdx]?.parsedDate     ?? null,
+        notes:      notesIdx >= 0 ? (row[notesIdx]?.trimmed || null) : null
       }
-
       employees.push(emp)
     }
   }
@@ -161,97 +185,92 @@ function mapToOnboarding(
   rows: NormalizedCell[][],
   _rawRows: unknown[][]
 ): OnboardingDashboardData {
-  // Find question text column
-  const questionColIdx = fields.findIndex((f) => f.semanticType === 'survey-question-text')
-  if (questionColIdx < 0) {
-    return {
-      questions: [],
-      dimensions: {},
-      responses: [],
-      totalRespondents: 0,
-      visibleQuestions: []
-    }
-  }
+  // ── Respondent-per-row format (LEAP Transform sheet) ──────────────────────
+  // Score columns end with "_Score" (camelCase-split → "... score" by the
+  // profiler), have numeric 1-5 values, and are classified as survey-score.
+  // One response per QUESTION is built by aggregating across respondents,
+  // grouped by dimension value so the heatmap can colour each cell.
 
-  // Find score columns
+  const buColIdx  = fields.findIndex((f) => f.semanticType === 'business-unit')
+  const locColIdx = fields.findIndex((f) => f.semanticType === 'location')
+  const tenColIdx = fields.findIndex((f) => f.semanticType === 'tenure-band')
+
+  // Collect score column indices (survey-score type)
   const scoreColIndices = fields
     .map((f, idx) => (f.semanticType === 'survey-score' ? idx : -1))
     .filter((idx) => idx >= 0)
 
-  // Find dimension columns
-  const buColIdx = fields.findIndex((f) => f.semanticType === 'business-unit')
-  const locColIdx = fields.findIndex((f) => f.semanticType === 'location')
-  const tenColIdx = fields.findIndex((f) => f.semanticType === 'tenure-band')
+  const empty: OnboardingDashboardData = {
+    questions: [], dimensions: {}, responses: [], totalRespondents: 0, visibleQuestions: []
+  }
+  if (scoreColIndices.length === 0) return empty
 
-  // Build dimensions from first row (assuming categorical headers)
-  const dimensions: Record<string, OnboardingDimension[]> = {}
-  const buValues = new Set<string>()
+  // Non-empty data rows only
+  const dataRows = rows.filter((row) => !row.every((c) => c.isEmptyLike))
+
+  // Build dimension value sets
+  const buValues  = new Set<string>()
   const locValues = new Set<string>()
   const tenValues = new Set<string>()
+  dataRows.forEach((row) => {
+    if (buColIdx  >= 0) { const v = row[buColIdx]?.trimmed;  if (v) buValues.add(v)  }
+    if (locColIdx >= 0) { const v = row[locColIdx]?.trimmed; if (v) locValues.add(v) }
+    if (tenColIdx >= 0) { const v = row[tenColIdx]?.trimmed; if (v) tenValues.add(v) }
+  })
 
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i]
-    if (buColIdx >= 0 && row[buColIdx] && !row[buColIdx].isEmptyLike) {
-      buValues.add(row[buColIdx].trimmed)
-    }
-    if (locColIdx >= 0 && row[locColIdx] && !row[locColIdx].isEmptyLike) {
-      locValues.add(row[locColIdx].trimmed)
-    }
-    if (tenColIdx >= 0 && row[tenColIdx] && !row[tenColIdx].isEmptyLike) {
-      tenValues.add(row[tenColIdx].trimmed)
-    }
-  }
+  const dimensions: Record<string, OnboardingDimension[]> = {}
+  if (buValues.size  > 0) dimensions['bu']  = Array.from(buValues).map((v)  => ({ value: v, count: 0 }))
+  if (locValues.size > 0) dimensions['loc'] = Array.from(locValues).map((v) => ({ value: v, count: 0 }))
+  if (tenValues.size > 0) dimensions['ten'] = Array.from(tenValues).map((v) => ({ value: v, count: 0 }))
 
-  if (buValues.size > 0) {
-    dimensions['bu'] = Array.from(buValues).map((v) => ({ value: v, count: 0 }))
-  }
-  if (locValues.size > 0) {
-    dimensions['loc'] = Array.from(locValues).map((v) => ({ value: v, count: 0 }))
-  }
-  if (tenValues.size > 0) {
-    dimensions['ten'] = Array.from(tenValues).map((v) => ({ value: v, count: 0 }))
-  }
+  // Build one Question + one aggregated Response per score column
+  const questions: OnboardingQuestion[] = scoreColIndices.map((idx, qi) => ({
+    id:   `q_${qi}`,
+    // Strip trailing "_Score" / "Score" suffix that the column profiler added
+    text: fields[idx].header
+      .replace(/\s*score\s*$/i, '')
+      .replace(/\._?$/,         '')
+      .trim()
+  }))
 
-  // Parse questions and responses
-  const questions: OnboardingQuestion[] = []
-  const responses: OnboardingResponse[] = []
-  let totalRespondents = 0
+  const responses: OnboardingResponse[] = scoreColIndices.map((scoreIdx, qi) => {
+    const qId = `q_${qi}`
 
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i]
-    const questionText = row[questionColIdx]?.trimmed
+    // Overall average across all respondents
+    const allNums = dataRows
+      .map((row) => row[scoreIdx]?.parsedNumber ?? null)
+      .filter((n): n is number => n !== null)
+    const allScore = allNums.length > 0
+      ? allNums.reduce((a, b) => a + b, 0) / allNums.length
+      : null
 
-    if (!questionText) continue
-
-    const qId = `q_${i - 1}`
-    questions.push({ id: qId, text: questionText })
-
-    let allScore: number | null = null
+    // Average per dimension value (used by the heatmap)
     const scores: Record<string, number | null> = {}
 
-    for (const scoreIdx of scoreColIndices) {
-      const field = fields[scoreIdx]
-      const scoreVal = row[scoreIdx]?.parsedNumber ?? null
-
-      if (field.header.toLowerCase().includes('all')) {
-        allScore = scoreVal
-        if (allScore !== null && allScore > totalRespondents) {
-          totalRespondents = Math.ceil(allScore)
-        }
-      } else {
-        const dimValue = field.header
-        scores[dimValue] = scoreVal
-      }
+    const addDimAvg = (values: Set<string>, colIdx: number) => {
+      values.forEach((dimVal) => {
+        const nums = dataRows
+          .filter((row) => row[colIdx]?.trimmed === dimVal)
+          .map((row)  => row[scoreIdx]?.parsedNumber ?? null)
+          .filter((n): n is number => n !== null)
+        scores[dimVal] = nums.length > 0
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : null
+      })
     }
 
-    responses.push({ id: qId, allScore, scores })
-  }
+    if (buColIdx  >= 0) addDimAvg(buValues,  buColIdx)
+    if (locColIdx >= 0) addDimAvg(locValues, locColIdx)
+    if (tenColIdx >= 0) addDimAvg(tenValues, tenColIdx)
+
+    return { id: qId, allScore, scores }
+  })
 
   return {
     questions,
     dimensions,
     responses,
-    totalRespondents: Math.max(totalRespondents, 1),
+    totalRespondents: dataRows.length,
     visibleQuestions: questions.map((q) => q.id)
   }
 }
@@ -291,8 +310,12 @@ function mapToOffboarding(
 
     for (const scoreIdx of scoreIndices) {
       const field = fields[scoreIdx]
-      const rawVal = row[scoreIdx]?.trimmed
-      const parsed = rawVal ? parseLikertValue(rawVal) : null
+      const cell = row[scoreIdx]
+      // parsedNumber is set by either the Likert parser (1-5) or the numeric
+      // parser; fall back to parseLikertValue on the raw text for safety.
+      const parsed =
+        cell?.parsedNumber ??
+        (cell?.trimmed ? parseLikertValue(cell.trimmed) : null)
 
       if (parsed !== null) {
         ratings[field.header] = parsed

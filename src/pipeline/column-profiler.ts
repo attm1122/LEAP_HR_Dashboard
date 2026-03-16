@@ -79,6 +79,10 @@ export function profileColumns(
 
     const normalizedHeader = header
       .trim()
+      // Split camelCase (e.g. CombinedBusinessUnit → Combined Business Unit)
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      // Replace underscores with spaces (e.g. Welcome_Score → Welcome Score)
+      .replace(/_/g, ' ')
       .toLowerCase()
       .replace(/\s+/g, ' ')
 

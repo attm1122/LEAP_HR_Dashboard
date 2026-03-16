@@ -1,18 +1,19 @@
 import type { ColumnProfile, SemanticField, SemanticFieldType } from './types'
 
 const HEADER_KEYWORDS: Record<SemanticFieldType, RegExp> = {
-  'identifier': /\b(id|employee\s*id|emp\s*id|staff\s*id|uid)\b/i,
+  // "employee number" / "staff number" added alongside id variants
+  'identifier': /\b(id|employee\s*id|employee\s*number|emp\s*id|emp\s*number|staff\s*id|staff\s*number|uid)\b/i,
   'person-name': /\b(name|employee\s*name|staff\s*name|full\s*name|first\s*name|last\s*name)\b/i,
-  // Require explicit "name" qualifier or clear supervisor term so that compound headers
-  // like "Manager Assessment" / "Manager Review" do NOT match here.
-  'manager-name': /\b(manager\s*name|line\s*manager|reporting\s*manager|direct\s*manager|supervisor|mgr\s*name)\b/i,
-  'business-unit': /\b(business\s*unit|division|function|team|department|bu|dept)\b/i,
-  'location': /\b(location|office|site|region|city|branch)\b/i,
+  // Standalone "manager" is kept here but scores only 1 word.  Compound patterns
+  // like "Manager Assessment" score 2 words in assessment-status and beat it.
+  'manager-name': /\b(manager\s*name|line\s*manager|reporting\s*manager|direct\s*manager|supervisor|mgr\s*name|manager|mgr)\b/i,
+  'business-unit': /\b(business\s*unit|combined\s*business\s*unit|division|function|team|department|bu|dept)\b/i,
+  'location': /\b(location|combined\s*location|office|site|region|city|branch)\b/i,
   'tenure-band': /\b(tenure|length\s*of\s*service|years\s*service|seniority|service\s*years)\b/i,
-  'probation-period': /\b(period|probation\s*period|month|3\s*month|6\s*month|12\s*month)\b/i,
-  // Explicitly include compound forms e.g. "Manager Assessment" / "Mgr Assessment"
+  // "assessed" captures the "Assessed" probation-period column in LEAP's files
+  'probation-period': /\b(assessed|period|probation\s*period|month|3\s*month|6\s*month|12\s*month)\b/i,
+  // Compound forms (e.g. "Manager Assessment") score 2 words and beat standalone "manager"
   'assessment-status': /\b(manager\s*assessment|mgr\s*assessment|self\s*assessment|self\s*review|self\s*evaluation|self|assessment|review|evaluation|status)\b/i,
-  // Removed generic "assessment|review" — covered by assessment-status above
   'assessment-score': /\b(self\s*score|mgr\s*score|manager\s*score|score|rating)\b/i,
   'survey-score': /\b(score|rating|avg|average|mean|value)\b/i,
   'survey-question-text': /\b(question|q\d+|item|prompt|text|description)\b/i,
@@ -31,8 +32,12 @@ function scoreHeaderMatch(normalizedHeader: string): SemanticFieldType[] {
 
   for (const [type, regex] of Object.entries(HEADER_KEYWORDS)) {
     if (type === 'unknown') continue
-    if (regex.test(normalizedHeader)) {
-      matches.push({ type: type as SemanticFieldType, score: 1 })
+    const match = regex.exec(normalizedHeader)
+    if (match) {
+      // Score by matched-text word count so that multi-word compound patterns
+      // (e.g. "manager assessment" → 2) beat single-word matches (e.g. "manager" → 1).
+      const wordCount = match[0].trim().split(/\s+/).length
+      matches.push({ type: type as SemanticFieldType, score: wordCount })
     }
   }
 

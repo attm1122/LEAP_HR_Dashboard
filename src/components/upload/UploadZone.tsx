@@ -94,8 +94,14 @@ const UploadZone: React.FC<UploadZoneProps> = ({ module }) => {
           setOffboarding(normalizedData.data)
         }
         break
-      default:
-        throw new Error('Could not determine data module type')
+      default: {
+        const detected = result.normalizedData.type
+        throw new Error(
+          detected === 'unknown'
+            ? 'Could not identify this file as a Probation, Onboarding, or Offboarding dataset. Check that column headings match the expected format.'
+            : `File was detected as "${detected}" which is not yet supported. Expected probation-review, onboarding-survey, or offboarding-survey.`
+        )
+      }
     }
   }
 
