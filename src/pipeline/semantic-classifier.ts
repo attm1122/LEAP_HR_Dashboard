@@ -3,20 +3,24 @@ import type { ColumnProfile, SemanticField, SemanticFieldType } from './types'
 const HEADER_KEYWORDS: Record<SemanticFieldType, RegExp> = {
   'identifier': /\b(id|employee\s*id|emp\s*id|staff\s*id|uid)\b/i,
   'person-name': /\b(name|employee\s*name|staff\s*name|full\s*name|first\s*name|last\s*name)\b/i,
-  'manager-name': /\b(manager|supervisor|line\s*manager|mgr|manager\s*name)\b/i,
+  // Require explicit "name" qualifier or clear supervisor term so that compound headers
+  // like "Manager Assessment" / "Manager Review" do NOT match here.
+  'manager-name': /\b(manager\s*name|line\s*manager|reporting\s*manager|direct\s*manager|supervisor|mgr\s*name)\b/i,
   'business-unit': /\b(business\s*unit|division|function|team|department|bu|dept)\b/i,
   'location': /\b(location|office|site|region|city|branch)\b/i,
   'tenure-band': /\b(tenure|length\s*of\s*service|years\s*service|seniority|service\s*years)\b/i,
   'probation-period': /\b(period|probation\s*period|month|3\s*month|6\s*month|12\s*month)\b/i,
-  'assessment-status': /\b(self\s*assessment|self\s*review|self\s*evaluation|self|assessment|review|evaluation|status)\b/i,
-  'assessment-score': /\b(self\s*score|mgr\s*score|manager\s*score|score|rating|assessment|review)\b/i,
+  // Explicitly include compound forms e.g. "Manager Assessment" / "Mgr Assessment"
+  'assessment-status': /\b(manager\s*assessment|mgr\s*assessment|self\s*assessment|self\s*review|self\s*evaluation|self|assessment|review|evaluation|status)\b/i,
+  // Removed generic "assessment|review" — covered by assessment-status above
+  'assessment-score': /\b(self\s*score|mgr\s*score|manager\s*score|score|rating)\b/i,
   'survey-score': /\b(score|rating|avg|average|mean|value)\b/i,
   'survey-question-text': /\b(question|q\d+|item|prompt|text|description)\b/i,
   'respondent-count': /\b(count|respondents|responses|n|sample\s*size)\b/i,
   'date': /\b(date|completed\s*on|review\s*date|assessment\s*date|started|ended|submission)\b/i,
   'yes-no': /\b(yes|no|flag|indicator|yn)\b/i,
   'exit-reason': /\b(reason|driver|leaving|departure\s*reason|exit\s*reason|resignation)\b/i,
-  'comment-text': /\b(comments?|feedback|notes?|remarks|notes|observations)\b/i,
+  'comment-text': /\b(comments?|feedback|notes?|remarks|observations)\b/i,
   'category': /\b(category|group|type|class)\b/i,
   'metric': /\b(metric|measure|kpi|indicator)\b/i,
   'unknown': /(?!)/
@@ -102,10 +106,18 @@ export function classifyFields(profiles: ColumnProfile[]): SemanticField[] {
         primaryType = headerMatches[0]
         confidence = 0.9
       } else {
-        // Signals conflict
-        primaryType = headerMatches[0] || valueMatches[0]
-        confidence = 0.6
-        isAmbiguous = true
+        // Signals conflict — header wins by default, but apply overrides:
+        // 1. If the column is very blank (>50%) and header says comment-text,
+        //    trust the header (notes/comments are often sparsely filled).
+        if (profile.blankRatio > 0.5 && headerMatches[0] === 'comment-text') {
+          primaryType = 'comment-text'
+          confidence = 0.7
+          isAmbiguous = false
+        } else {
+          primaryType = headerMatches[0] || valueMatches[0]
+          confidence = 0.6
+          isAmbiguous = true
+        }
       }
     } else if (headerMatches.length > 0) {
       primaryType = headerMatches[0]
